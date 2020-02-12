@@ -44,25 +44,24 @@ class Invoice
     /** Přijatý opravný daňový doklad (jen CZ verze) */
     const TYPE_RECEIVED_CORRECTIVE_TAX = "receivedCorrectiveTax";
 
-    /** Příkazem */
-    const PAYMENT_TYPE_DRAFT = "draft";
-    /** Hotově */
-    const PAYMENT_TYPE_CASH = "cash";
-    /** Složenkou */
-    const PAYMENT_TYPE_POSTAL = "postal";
-    /** Dobírka */
-    const PAYMENT_TYPE_DELIVERY = "delivery";
-    /** Platební kartou */
-    const PAYMENT_TYPE_CREDITCARD = "creditcard";
-    /** Zálohová faktura */
-    const PAYMENT_TYPE_ADVANCE = "advance";
-    /** Inkasem */
-    const PAYMENT_TYPE_ENCASHMENT = "encashment";
-    /** Šekem */
-    const PAYMENT_TYPE_CHEQUE = "cheque";
-    /** Zápočtem */
-    const PAYMENT_TYPE_COMPENSATION = "compensation";
-
+    /** Cizí měna. */
+    const PAYMENT_TYPE_FOREIGN_CURRENCY = 'foreignCurrency';
+    /** Hotovost. */
+    const PAYMENT_TYPE_CASH = 'cash';
+    /** Ostatní. */
+    const PAYMENT_TYPE_OTHER = 'other';
+    /** Platební karta. */
+    const PAYMENT_TYPE_CREDIT_CARD = 'creditCard';
+    /** Převodem. */
+    const PAYMENT_TYPE_TRANSFER = 'transfer';
+    /** Stravenka. */
+    const PAYMENT_TYPE_TICKET = 'ticket';
+    /** Šekem. */
+    const PAYMENT_TYPE_CHEQUE = 'cheque';
+    /** Záloha. */
+    const PAYMENT_TYPE_ADVANCE = 'advance';
+    /** Dobírka. */
+    const PAYMENT_TYPE_DELIVERY = 'delivery';
 
     private $cancel; //cislo stornovaneho dokumentu
     private $cancelNumber; //ciselna rada pro storno
@@ -70,7 +69,7 @@ class Invoice
     private $withVAT = false;
 
     private $type = self::TYPE_ISSUED_INVOICE;
-    private $paymentType = self::PAYMENT_TYPE_DRAFT;
+    private $paymentType = self::PAYMENT_TYPE_OTHER;
     private $roundingDocument = 'math2one';
     private $roundingVAT = 'none';
 
@@ -275,21 +274,21 @@ class Invoice
      */
     public function setPaymentType($value)
     {
-        $payments = [
-            self::PAYMENT_TYPE_DRAFT        => "příkazem",
-            self::PAYMENT_TYPE_CASH         => "hotově",
-            self::PAYMENT_TYPE_POSTAL       => "složenkou",
-            self::PAYMENT_TYPE_DELIVERY     => "dobírka",
-            self::PAYMENT_TYPE_CREDITCARD   => "platební kartou",
-            self::PAYMENT_TYPE_ADVANCE      => "zálohová faktura",
-            self::PAYMENT_TYPE_ENCASHMENT   => "inkasem",
-            self::PAYMENT_TYPE_CHEQUE       => "šekem",
-            self::PAYMENT_TYPE_COMPENSATION => "zápočtem",
+        $allowed_payment_types = [
+            self::PAYMENT_TYPE_FOREIGN_CURRENCY,
+            self::PAYMENT_TYPE_CASH,
+            self::PAYMENT_TYPE_OTHER,
+            self::PAYMENT_TYPE_CREDIT_CARD,
+            self::PAYMENT_TYPE_TRANSFER,
+            self::PAYMENT_TYPE_TICKET,
+            self::PAYMENT_TYPE_CHEQUE,
+            self::PAYMENT_TYPE_ADVANCE,
+            self::PAYMENT_TYPE_DELIVERY,
         ];
 
-        if(is_null($value) || !isset($payments[$value]))
+        if(is_null($value) || !in_array($value,$allowed_payment_types))
         {
-            throw new InvoiceException($this->getId().": payment type $value is not supported. Use one of these: ".implode(",", array_keys($payments)));
+            throw new InvoiceException($this->getId().": payment type $value is not supported. Use one of these: ".implode(",", $allowed_payment_types));
         }
         $this->paymentType = $value;
     }
@@ -864,4 +863,3 @@ class Invoice
 class InvoiceException extends \Exception
 {
 }
-
