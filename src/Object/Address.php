@@ -28,14 +28,14 @@ class Address
 	public function __construct($value)
 	{
 		if (isset($value['name'])) {
-			$this->name = $this->validateItem('name', $value['name'], 32);
+			$this->name = $this->validateItem('name', $value['name'], 64);
 		}
 		if (isset($value['street'])) {
 			$this->street = $this->validateItem('street', $value['street'], 64);
 		}
 		if (isset($value['zip'])) {
 			$value['zip'] = $this->removeSpaces($value['zip']);
-			$this->zip = $this->validateItem('zip', $value['zip'], 15, true);
+			$this->zip = $this->validateItem('zip', $value['zip'], 15, false);
 		}
 		if (isset($value['city'])) {
 			$this->city = $this->validateItem('city', $value['city'], 45);

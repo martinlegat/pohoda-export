@@ -44,24 +44,25 @@ class Invoice
     /** Přijatý opravný daňový doklad (jen CZ verze) */
     const TYPE_RECEIVED_CORRECTIVE_TAX = "receivedCorrectiveTax";
 
-    /** Cizí měna. */
-    const PAYMENT_TYPE_FOREIGN_CURRENCY = 'foreignCurrency';
-    /** Hotovost. */
+    /** Příkazem */
+    const PAYMENT_TYPE_DRAFT = 'draft';
+    /** Hotově */
     const PAYMENT_TYPE_CASH = 'cash';
-    /** Ostatní. */
-    const PAYMENT_TYPE_OTHER = 'other';
-    /** Platební karta. */
-    const PAYMENT_TYPE_CREDIT_CARD = 'creditCard';
-    /** Převodem. */
-    const PAYMENT_TYPE_TRANSFER = 'transfer';
-    /** Stravenka. */
-    const PAYMENT_TYPE_TICKET = 'ticket';
-    /** Šekem. */
-    const PAYMENT_TYPE_CHEQUE = 'cheque';
-    /** Záloha. */
-    const PAYMENT_TYPE_ADVANCE = 'advance';
-    /** Dobírka. */
+    /** Složenkou */
+    const PAYMENT_TYPE_POSTAL = 'postal';
+    /** Dobírka */
     const PAYMENT_TYPE_DELIVERY = 'delivery';
+    /** Platební kartou */
+    const PAYMENT_TYPE_CREDITCARD = 'creditcard';
+    /** Zálohová faktura */
+    const PAYMENT_TYPE_ADVANCE = 'advance';
+    /** Inkasem */
+    const PAYMENT_TYPE_ENCASHMENT = 'encashment';
+    /** Šekem */
+    const PAYMENT_TYPE_CHEQUE = 'cheque';
+    /** Zápočtem */
+    const PAYMENT_TYPE_COMPENSATION = 'compensation';
+
 
     private $cancel; //cislo stornovaneho dokumentu
     private $cancelNumber; //ciselna rada pro storno
@@ -69,7 +70,7 @@ class Invoice
     private $withVAT = false;
 
     private $type = self::TYPE_ISSUED_INVOICE;
-    private $paymentType = self::PAYMENT_TYPE_OTHER;
+    private $paymentType = self::PAYMENT_TYPE_DRAFT;
     private $roundingDocument = 'math2one';
     private $roundingVAT = 'none';
 
@@ -80,12 +81,12 @@ class Invoice
     private $dateDue;
     private $dateOrder; //datum objednani
     private $text;
-    private $bankShortcut = '';
+    private $bankShortcut = null;
     private $note;
 
     private $paymentTypeString; //forma uhrady
     private $accounting;
-    private $symbolicNumber = '0308';
+    private $symbolicNumber = '';
 
     private $priceNone;
     private $priceLow;
@@ -275,22 +276,24 @@ class Invoice
     public function setPaymentType($value)
     {
         $allowed_payment_types = [
-            self::PAYMENT_TYPE_FOREIGN_CURRENCY,
-            self::PAYMENT_TYPE_CASH,
-            self::PAYMENT_TYPE_OTHER,
-            self::PAYMENT_TYPE_CREDIT_CARD,
-            self::PAYMENT_TYPE_TRANSFER,
-            self::PAYMENT_TYPE_TICKET,
-            self::PAYMENT_TYPE_CHEQUE,
-            self::PAYMENT_TYPE_ADVANCE,
-            self::PAYMENT_TYPE_DELIVERY,
+            self::PAYMENT_TYPE_DRAFT        => 'Příkazem',
+            self::PAYMENT_TYPE_CASH         => 'Hotově',
+            self::PAYMENT_TYPE_POSTAL       => 'Složenkou',
+            self::PAYMENT_TYPE_DELIVERY     => 'Dobírka',
+            self::PAYMENT_TYPE_CREDITCARD   => 'Platební kar',
+            self::PAYMENT_TYPE_ADVANCE      => 'Zálohová fak',
+            self::PAYMENT_TYPE_ENCASHMENT   => 'Inkasem',
+            self::PAYMENT_TYPE_CHEQUE       => 'Šekem',
+            self::PAYMENT_TYPE_COMPENSATION => 'Zápočtem',
         ];
 
-        if(is_null($value) || !in_array($value,$allowed_payment_types))
+
+        if(is_null($value) || !array_key_exists($value, $allowed_payment_types))
         {
-            throw new InvoiceException($this->getId().": payment type $value is not supported. Use one of these: ".implode(",", $allowed_payment_types));
+            throw new InvoiceException($this->getId().": payment type $value is not supported. Use one of these: ".implode(",", array_keys($allowed_payment_types)));
         }
         $this->paymentType = $value;
+        $this->setPaymentTypeString($allowed_payment_types[$value]);
     }
 
     /** @deprecated */
@@ -434,7 +437,7 @@ class Invoice
         if(isset($value['zip']))
         {
             $value['zip'] = $this->removeSpaces($value['zip']);
-            $this->validateItem('provider - zip', $value['zip'], 15, true);
+            $this->validateItem('provider - zip', $value['zip'], 15, false);
         }
         if(isset($value['city']))
         {
@@ -584,8 +587,11 @@ class Invoice
             $paymentType->addChild('typ:ids', $this->paymentTypeString, Export::NS_TYPE);
         }
 
-        $account = $header->addChild("inv:account");
-        $account->addChild('typ:ids', $this->bankShortcut, Export::NS_TYPE);
+        if($this->bankShortcut !== null)
+        {
+            $account = $header->addChild("inv:account");
+            $account->addChild('typ:ids', $this->bankShortcut, Export::NS_TYPE);
+        }
 
         if(isset($this->note))
         {
@@ -760,22 +766,6 @@ class Invoice
         $summary->addChild('inv:roundingDocument', $this->roundingDocument); //matematicky na koruny
         $summary->addChild('inv:roundingVAT', $this->roundingVAT);
 
-        $hc = $summary->addChild("inv:homeCurrency");
-        if(is_null($this->priceNone) === false)
-            $hc->addChild('typ:priceNone', $this->priceNone, Export::NS_TYPE); //cena v nulove sazbe dph
-        if(is_null($this->priceLow) === false)
-            $hc->addChild('typ:priceLow', $this->priceLow, Export::NS_TYPE); //cena bez dph ve snizene sazbe (15)
-        if(is_null($this->priceLowVAT) === false)
-            $hc->addChild('typ:priceLowVAT', $this->priceLowVAT, Export::NS_TYPE); //dph ve snizene sazbe
-        if(is_null($this->priceLowSum) === false)
-            $hc->addChild('typ:priceLowSum', $this->priceLowSum, Export::NS_TYPE); //s dph ve snizene sazbe
-        if(is_null($this->priceHigh) === false)
-            $hc->addChild('typ:priceHigh', $this->priceHigh, Export::NS_TYPE); //cena bez dph ve zvysene sazbe (21)
-        if(is_null($this->priceHightVAT) === false)
-            $hc->addChild('typ:priceHighVAT', $this->priceHightVAT, Export::NS_TYPE);
-        if(is_null($this->priceHighSum) === false)
-            $hc->addChild('typ:priceHighSum', $this->priceHighSum, Export::NS_TYPE);
-
         if($this->foreignCurrency !== null)
         {
             $fc = $summary->addChild('inv:foreignCurrency');
@@ -787,10 +777,27 @@ class Invoice
                 $fc->addChild('typ:priceSum', $this->foreignCurrencyPriceSum, Export::NS_TYPE);
             }
         }
+        else
+        {
+            $hc = $summary->addChild("inv:homeCurrency");
+            if(is_null($this->priceNone) === false)
+                $hc->addChild('typ:priceNone', $this->priceNone, Export::NS_TYPE); //cena v nulove sazbe dph
+            if(is_null($this->priceLow) === false)
+                $hc->addChild('typ:priceLow', $this->priceLow, Export::NS_TYPE); //cena bez dph ve snizene sazbe (15)
+            if(is_null($this->priceLowVAT) === false)
+                $hc->addChild('typ:priceLowVAT', $this->priceLowVAT, Export::NS_TYPE); //dph ve snizene sazbe
+            if(is_null($this->priceLowSum) === false)
+                $hc->addChild('typ:priceLowSum', $this->priceLowSum, Export::NS_TYPE); //s dph ve snizene sazbe
+            if(is_null($this->priceHigh) === false)
+                $hc->addChild('typ:priceHigh', $this->priceHigh, Export::NS_TYPE); //cena bez dph ve zvysene sazbe (21)
+            if(is_null($this->priceHightVAT) === false)
+                $hc->addChild('typ:priceHighVAT', $this->priceHightVAT, Export::NS_TYPE);
+            if(is_null($this->priceHighSum) === false)
+                $hc->addChild('typ:priceHighSum', $this->priceHighSum, Export::NS_TYPE);
 
-        $round = $hc->addChild('typ:round', null, Export::NS_TYPE);
-        $round->addChild('typ:priceRound', 0, Export::NS_TYPE); //Celková suma zaokrouhleni
-
+            $round = $hc->addChild('typ:round', null, Export::NS_TYPE);
+            $round->addChild('typ:priceRound', 0, Export::NS_TYPE); //Celková suma zaokrouhleni
+        }
     }
 
     /**
