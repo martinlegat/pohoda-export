@@ -109,6 +109,8 @@ class Invoice
 
     private $myIdentity = [];
 
+    private $regVatInEuTin = null;
+
     /** @var Address */
     private $customerAddress;
 
@@ -323,6 +325,16 @@ class Invoice
     {
         $this->validateItem('contract', $value, 19);
         $this->contract = $value;
+    }
+
+    public function setRegVatInEuTin($value)
+    {
+        if($value === '') $value = null;
+        elseif($value !== null && !preg_match('#^[a-z]{2}\d{9,10}$#i', $value))
+        {
+            throw new InvoiceException($this->getId().": RegVATinEU - TIN - invalid value ".$value);
+        }
+        $this->regVatInEuTin = $value == '' ? null : $value;
     }
 
 
@@ -558,6 +570,12 @@ class Invoice
         if(!is_null($this->dateAccounting))
             $header->addChild("inv:dateAccounting", $this->dateAccounting);
 
+        if(!is_null($this->regVatInEuTin))
+        {
+            $regVATinEU = $header->addChild("inv:regVATinEU");
+            $regVATinEU->addChild('typ:ids', $this->regVatInEuTin);
+        }
+
 
         $classification = $header->addChild("inv:classificationVAT");
         if($this->withVAT)
@@ -655,6 +673,8 @@ class Invoice
             $item->addChild("inv:payVAT", $product->isPayVAT() ? 'true' : 'false');
             if($product->getRateVAT())
                 $item->addChild("inv:rateVAT", $product->getRateVAT());
+            if($product->getPercentVAT())
+                $item->addChild("inv:percentVAT", $product->getPercentVAT());
             if($product->getDiscountPercentage())
                 $item->addChild("inv:discountPercentage", $product->getDiscountPercentage());
 
