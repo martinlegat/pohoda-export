@@ -136,14 +136,14 @@ class Invoice
     }
 
     /**
-     * @param $bool
+     * @param $bool_or_string
      * @throws InvoiceException
      */
-    public function setWithVat($bool)
+    public function setWithVat($bool_or_string)
     {
-        if(is_bool($bool) === false)
+        if(!is_bool($bool_or_string) && !(is_string($bool_or_string) && $bool_or_string !== ''))
             throw new InvoiceException($this->getId().": setWithVat must use boolean value");
-        $this->withVAT = $bool;
+        $this->withVAT = $bool_or_string;
     }
 
     public function getId()
@@ -573,21 +573,26 @@ class Invoice
         if(!is_null($this->regVatInEuTin))
         {
             $regVATinEU = $header->addChild("inv:regVATinEU");
-            $regVATinEU->addChild('typ:ids', $this->regVatInEuTin);
+            $regVATinEU->addChild('typ:ids', $this->regVatInEuTin, Export::NS_TYPE);
         }
 
 
         $classification = $header->addChild("inv:classificationVAT");
-        if($this->withVAT)
+        if($this->withVAT === true)
         {
             //tuzemske plneni
             $classification->addChild('typ:classificationVATType', 'inland', Export::NS_TYPE);
         }
-        else
+        elseif($this->withVAT === false)
         {
             //nezahrnovat do dph
             $classification->addChild('typ:ids', 'UN', Export::NS_TYPE);
             $classification->addChild('typ:classificationVATType', 'nonSubsume', Export::NS_TYPE);
+        }
+        else
+        {
+            $classification->addChild('typ:ids', $this->withVAT, Export::NS_TYPE);
+            $classification->addChild('typ:classificationVATType', 'inland', Export::NS_TYPE);
         }
 
         if(!is_null($this->accounting))
@@ -662,7 +667,7 @@ class Invoice
 
     private function exportDetail(SimpleXMLElement $detail)
     {
-        foreach($this->items AS $product)
+        foreach($this->items as $product)
         {
             /** @var InvoiceItem $product */
             $item = $detail->addChild("inv:invoiceItem");
@@ -714,7 +719,7 @@ class Invoice
         }
     }
 
-    private function exportAddress(SimpleXMLElement $xml, Array $data, $type = "address")
+    private function exportAddress(SimpleXMLElement $xml, array $data, $type = "address")
     {
 
         $address = $xml->addChild('typ:'.$type, null, Export::NS_TYPE);
